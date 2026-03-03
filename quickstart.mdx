@@ -149,12 +149,15 @@ If you prefer to run without Docker:
 
 The API returns two key values:
 
-```python
+```json
 {
-  "stroke_probability": 0.234,  # Raw model output (0.0 to 1.0)
-  "stroke_prediction": true     # Binary decision at 0.09 threshold
+  "stroke_probability": 0.234,
+  "stroke_prediction": true
 }
 ```
+
+- `stroke_probability` - Raw model output (0.0 to 1.0)
+- `stroke_prediction` - Binary decision at 0.09 threshold
 
 <Info>
 The 0.09 threshold was optimized to maximize F1-Score on the validation set, balancing precision and recall for the imbalanced dataset.
