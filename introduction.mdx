@@ -1,0 +1,109 @@
+---
+title: Introduction
+description: A machine learning API that predicts stroke risk based on patient health data and lifestyle factors
+---
+
+# Stroke Risk Predictor
+
+The Stroke Risk Predictor is a production-ready machine learning API that helps assess an individual's risk of stroke based on their health attributes and lifestyle habits. Built as part of the ML Zoomcamp, this project demonstrates end-to-end ML deployment from training to production.
+
+<Note>
+**Try it now:** The API is deployed and accessible at [api.stroke-predictor.acel.dev](https://api.stroke-predictor.acel.dev/) with a live Streamlit frontend at [stroke-risk-predictor-acel.streamlit.app](https://stroke-risk-predictor-acel.streamlit.app/)
+</Note>
+
+## What it does
+
+This tool takes patient information including age, medical history (hypertension, heart disease), lifestyle factors (smoking status, BMI), and demographic data to predict stroke probability. The model uses an optimized Logistic Regression classifier trained on the Kaggle Stroke Prediction Dataset.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="High accuracy" icon="chart-line">
+    Achieves 85.14% ROC-AUC score on unseen test data with an optimized decision threshold of 0.09
+  </Card>
+  
+  <Card title="Production ready" icon="rocket">
+    FastAPI-based REST API with automatic OpenAPI documentation and Docker containerization
+  </Card>
+  
+  <Card title="Interpretable model" icon="lightbulb">
+    Uses Logistic Regression (C=35) for transparency - no black box predictions
+  </Card>
+  
+  <Card title="Handles imbalance" icon="scale-balanced">
+    Designed for highly imbalanced data (only 4.8% stroke cases) using ROC-AUC and F1-Score metrics
+  </Card>
+</CardGroup>
+
+## Model performance
+
+The final model was evaluated on a held-out 20% test set:
+
+- **ROC-AUC Score:** 0.8514
+- **F1-Score (at 0.09 threshold):** 0.2973
+- **Model:** Tuned Logistic Regression with C=35
+- **Optimal threshold:** 0.09 (optimized for F1-Score)
+
+<Info>
+The model was chosen over more complex alternatives (Random Forest, XGBoost) because it provides equivalent performance while being simpler, faster to train, and fully interpretable.
+</Info>
+
+## Use cases
+
+This tool is designed for preliminary risk assessment and educational purposes. It can help:
+
+- Individuals get a preliminary understanding of their stroke risk factors
+- Healthcare educators demonstrate ML applications in medical screening
+- Developers learn how to deploy ML models in production
+
+<Warning>
+This is not a medical diagnostic tool. Always consult healthcare professionals for medical advice and diagnosis.
+</Warning>
+
+## Quick links
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="play" href="/quickstart">
+    Get started with your first prediction in 5 minutes
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore all API endpoints and request schemas
+  </Card>
+  
+  <Card title="Interactive Demo" icon="window" href="https://stroke-risk-predictor-acel.streamlit.app">
+    Try the Streamlit web interface
+  </Card>
+  
+  <Card title="API Docs" icon="book" href="https://api.stroke-predictor.acel.dev/docs">
+    View the live OpenAPI/Swagger documentation
+  </Card>
+</CardGroup>
+
+## How it works
+
+The prediction pipeline consists of:
+
+1. **Data preprocessing** - Handles missing BMI values (filled with mean: 106.45) and categorical encoding
+2. **Feature vectorization** - Uses DictVectorizer to convert input features to model format
+3. **Prediction** - Logistic Regression model outputs probability scores
+4. **Thresholding** - Applies optimized 0.09 threshold for binary classification
+
+## Input features
+
+The model accepts 10 patient attributes:
+
+- `age` - Patient age in years
+- `gender` - Male, Female, or Other
+- `hypertension` - 0 (No) or 1 (Yes)
+- `heart_disease` - 0 (No) or 1 (Yes)
+- `ever_married` - Yes or No
+- `work_type` - Private, Self-employed, Govt_job, children, or Never_worked
+- `residence_type` - Urban or Rural
+- `avg_glucose_level` - Average glucose level (optional, defaults to 106.45 if not provided)
+- `bmi` - Body Mass Index
+- `smoking_status` - formerly smoked, never smoked, smokes, or Unknown
+
+<Tip>
+The `avg_glucose_level` field is optional. If you don't provide it, the API will use the dataset mean (106.45).
+</Tip>

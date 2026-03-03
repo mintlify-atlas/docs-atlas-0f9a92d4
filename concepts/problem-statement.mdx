@@ -1,0 +1,82 @@
+---
+title: Problem statement
+description: Understanding the stroke prediction challenge and evaluation approach
+---
+
+## Overview
+
+Stroke prediction is a critical healthcare challenge that requires machine learning to identify at-risk individuals before a stroke occurs. This project builds a model that accurately predicts the likelihood of a person having a stroke, trained on real patient data from a public Kaggle dataset.
+
+The goal is to create a tool that an average person can use to get a preliminary risk assessment based on their current health attributes and lifestyle habits.
+
+## Binary classification task
+
+This is a **binary classification problem** where the model predicts one of two outcomes:
+
+- **0 (No Stroke):** The patient is not predicted to have a stroke
+- **1 (Stroke):** The patient is predicted to have a stroke
+
+The model analyzes 11 patient features (age, hypertension, heart disease, BMI, glucose levels, smoking status, etc.) and outputs a probability score between 0 and 1, indicating the likelihood of stroke.
+
+## The class imbalance challenge
+
+The dataset is **highly imbalanced** with only **4.8% of cases being stroke patients** (249 out of 5,110 total cases). This severe imbalance presents a critical challenge for model evaluation and training.
+
+<Note>
+In the original dataset:
+- **No Stroke:** 4,861 cases (95.1%)
+- **Stroke:** 249 cases (4.8%)
+</Note>
+
+### Why this matters
+
+With such extreme imbalance, a naive model could achieve 95.1% accuracy by simply predicting "No Stroke" for every patient. However, this model would be completely useless in practice because it would fail to identify any at-risk individuals.
+
+## Evaluation metrics
+
+Because of the class imbalance, **accuracy is a misleading metric**. Instead, you should use metrics that account for both false positives and false negatives:
+
+### ROC-AUC (Primary metric)
+
+**ROC-AUC (Receiver Operating Characteristic - Area Under Curve)** measures the model's ability to rank predictions correctly across all possible thresholds. It evaluates how well the model separates the two classes.
+
+- **Range:** 0.0 to 1.0
+- **Interpretation:** Higher is better (0.5 = random guessing, 1.0 = perfect)
+- **Why it's used:** It measures overall ranking performance regardless of the decision threshold
+
+<Info>
+The final model achieved a **ROC-AUC score of 0.8514** on the unseen test set, indicating strong discriminative ability.
+</Info>
+
+### F1-Score (Secondary metric)
+
+**F1-Score** is the harmonic mean of precision and recall, providing a balanced measure of the model's performance on the positive (stroke) class.
+
+- **Precision:** Of all patients the model flagged as "at risk," what percentage actually had strokes?
+- **Recall:** Of all actual stroke patients, what percentage did the model successfully identify?
+- **F1-Score:** Balances both precision and recall into a single metric
+
+The F1-Score is threshold-dependent, so you need to optimize the decision threshold to maximize it.
+
+<Info>
+The final model achieved an **F1-Score of 0.2973** at the optimized threshold of **0.09**.
+</Info>
+
+### Why not use accuracy?
+
+If you predicted "No Stroke" for every patient, you would achieve:
+- **Accuracy:** 95.1% (misleadingly high)
+- **Recall:** 0% (completely fails to identify stroke patients)
+- **F1-Score:** 0% (reflects actual uselessness)
+
+This demonstrates why accuracy is inappropriate for imbalanced datasets. The model must be evaluated on its ability to find the minority class (stroke patients), not just its overall correctness.
+
+## Model objectives
+
+Given the healthcare context, the model prioritizes:
+
+1. **High recall:** Identify as many actual stroke patients as possible (minimize false negatives)
+2. **Acceptable precision:** Keep false positives reasonable to avoid unnecessary alarm
+3. **Interpretability:** Provide explainable risk scores for medical decision-making
+
+The optimized threshold of 0.09 reflects a deliberate choice to be more aggressive in flagging potential stroke risk, accepting more false positives to ensure fewer stroke cases are missed.

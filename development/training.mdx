@@ -1,0 +1,178 @@
+---
+title: Training the model
+description: Learn how to train the stroke risk prediction model using Logistic Regression
+---
+
+This guide walks you through the complete training process for the stroke risk prediction model, from data preprocessing to saving the trained model.
+
+## Overview
+
+The training pipeline uses Logistic Regression with carefully tuned hyperparameters to predict stroke risk. The model is trained on the [Stroke Prediction Dataset from Kaggle](https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset) and achieves a ROC-AUC score of 0.8514 on the test set.
+
+## Running the training script
+
+The training process is automated in the `train.py` script. To train the model:
+
+```bash
+python train.py
+```
+
+This script will:
+- Load and preprocess the dataset
+- Split the data into train and test sets
+- Train a Logistic Regression model
+- Save the trained model and vectorizer to disk
+
+## Training process
+
+<Steps>
+
+### Load the dataset
+
+The training script loads the dataset from the CSV file:
+
+```python
+df = pd.read_csv('healthcare-dataset-stroke-data.csv')
+```
+
+### Preprocess the data
+
+Three critical preprocessing steps are applied:
+
+**1. BMI imputation**
+
+Missing BMI values (~200 rows) are filled with the mean:
+
+```python
+bmi_mean = df['bmi'].mean()
+df['bmi'] = df['bmi'].fillna(bmi_mean)
+```
+
+**2. Column name standardization**
+
+All column names are converted to lowercase for consistency:
+
+```python
+df.columns = df.columns.str.lower()
+```
+
+**3. ID column removal**
+
+The `id` column is dropped as it doesn't contribute to predictions:
+
+```python
+df = df.drop('id', axis=1)
+```
+
+<Note>
+The `smoking_status` column contains ~1,500 "Unknown" values, which are treated as a separate category rather than being imputed.
+</Note>
+
+### Split the dataset
+
+The data is split into training (80%) and test (20%) sets with a fixed random seed for reproducibility:
+
+```python
+df_full_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+y_test = df_test.stroke.values
+del df_test['stroke']
+
+y_full_train = df_full_train['stroke'].values
+X_full_train_df = df_full_train.drop('stroke', axis=1)
+```
+
+### Feature encoding with DictVectorizer
+
+The dataset contains both categorical and numerical features. DictVectorizer is used to encode these features into a format suitable for machine learning:
+
+```python
+dv_full = DictVectorizer(sparse=True)
+X_full_train = dv_full.fit_transform(X_full_train_df.to_dict(orient='records'))
+```
+
+DictVectorizer automatically:
+- One-hot encodes categorical features (gender, work_type, smoking_status, etc.)
+- Keeps numerical features as-is (age, bmi, avg_glucose_level, etc.)
+- Creates a sparse matrix for memory efficiency
+
+### Train the model
+
+The model uses Logistic Regression with carefully tuned hyperparameters:
+
+```python
+model = LogisticRegression(solver='liblinear', C=35, max_iter=1000, random_state=42)
+model.fit(X_full_train, y_full_train)
+```
+
+**Hyperparameter details:**
+
+| Parameter | Value | Purpose |
+|-----------|-------|----------|
+| `solver` | `'liblinear'` | Efficient for smaller datasets and supports L1/L2 regularization |
+| `C` | `35` | Inverse regularization strength (tuned value for optimal performance) |
+| `max_iter` | `1000` | Maximum iterations for convergence |
+| `random_state` | `42` | Fixed seed for reproducible results |
+
+<Info>
+The regularization parameter `C=35` was found through hyperparameter tuning. Higher C values mean less regularization, allowing the model to fit the training data more closely.
+</Info>
+
+### Save the model artifacts
+
+Two binary files are saved using pickle:
+
+**1. DictVectorizer (`dv.bin`)**
+
+```python
+with open('dv.bin', 'wb') as f_out:
+    pickle.dump(dv_full, f_out)
+    print("Vectorizer saved to dv.bin")
+```
+
+The vectorizer must be saved to ensure consistent feature encoding during inference.
+
+**2. Trained model (`model.bin`)**
+
+```python
+with open('model.bin', 'wb') as f_out:
+    pickle.dump(model, f_out)
+    print("Model saved to model.bin")
+```
+
+</Steps>
+
+## Dataset features
+
+The model is trained on 10 features:
+
+**Categorical features:**
+- `gender` - Male, Female, or Other
+- `ever_married` - Yes or No
+- `work_type` - Private, Self-employed, Govt_job, children, or Never_worked
+- `residence_type` - Urban or Rural
+- `smoking_status` - formerly smoked, never smoked, smokes, or Unknown
+
+**Numerical features:**
+- `age` - Patient's age in years
+- `hypertension` - 0 (no) or 1 (yes)
+- `heart_disease` - 0 (no) or 1 (yes)
+- `avg_glucose_level` - Average glucose level in blood
+- `bmi` - Body Mass Index
+
+**Target variable:**
+- `stroke` - 0 (no stroke) or 1 (had stroke)
+
+<Note>
+The dataset is highly imbalanced with only ~4.8% of cases labeled as stroke. This imbalance is addressed through threshold optimization during evaluation.
+</Note>
+
+## Why Logistic Regression?
+
+Logistic Regression was chosen as the final model over RandomForest and XGBoost because:
+
+1. **Superior performance** - Achieved the best ROC-AUC score (0.8514) compared to other models
+2. **Interpretability** - Coefficients can be directly interpreted, unlike "black box" models
+3. **Simplicity** - Faster to train and deploy
+4. **Handles imbalance well** - Better suited for imbalanced datasets when properly tuned
+
+See the [evaluation guide](/development/evaluation) for detailed performance comparisons.

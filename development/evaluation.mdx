@@ -1,0 +1,275 @@
+---
+title: Model evaluation and metrics
+description: Understand how the stroke risk prediction model is evaluated and why specific metrics were chosen
+---
+
+This guide explains the evaluation methodology, metrics, and model selection process for the stroke risk prediction model.
+
+## Evaluation overview
+
+You can evaluate the trained model by running:
+
+```bash
+python test_model.py
+```
+
+This script loads the saved model and vectorizer, applies them to the test set, and calculates performance metrics.
+
+## Final model performance
+
+The Logistic Regression model achieves the following performance on the unseen 20% test set:
+
+| Metric | Score | Threshold |
+|--------|-------|----------|
+| **ROC-AUC** | **0.8514** | N/A |
+| **F1-Score** | **0.2973** | 0.09 |
+
+<Info>
+These metrics are calculated on completely unseen test data (20% of the dataset) that was held out during training.
+</Info>
+
+## Evaluation metrics
+
+### ROC-AUC Score
+
+The **ROC-AUC (Receiver Operating Characteristic - Area Under Curve)** score measures the model's ability to distinguish between the two classes across all possible classification thresholds.
+
+**Why ROC-AUC?**
+- Works well with imbalanced datasets (our dataset has only ~4.8% stroke cases)
+- Evaluates the model's ranking ability rather than raw predictions
+- Threshold-independent metric
+
+**Implementation:**
+
+```python
+from sklearn.metrics import roc_auc_score
+
+y_pred_proba = model.predict_proba(X_test)[:, 1]
+final_auc = roc_auc_score(y_test, y_pred_proba)
+print(f"Final ROC-AUC Score: {final_auc:.4f}")
+# Output: Final ROC-AUC Score: 0.8514
+```
+
+**Score interpretation:**
+- 0.5 = Random guessing
+- 0.7-0.8 = Acceptable performance
+- 0.8-0.9 = Excellent performance ✓
+- 1.0 = Perfect classification
+
+### F1-Score
+
+The **F1-Score** is the harmonic mean of precision and recall, providing a balance between false positives and false negatives.
+
+**Why F1-Score?**
+- Accuracy is misleading for imbalanced datasets (predicting "no stroke" for everyone would give ~95% accuracy)
+- F1 balances precision (how many predicted strokes are correct) and recall (how many actual strokes we catch)
+- Useful for finding the optimal classification threshold
+
+**Implementation:**
+
+```python
+from sklearn.metrics import f1_score
+
+best_threshold = 0.09
+y_pred_binary = (y_pred_proba >= best_threshold).astype(int)
+final_f1 = f1_score(y_test, y_pred_binary)
+print(f"Final F1-Score (at {best_threshold} threshold): {final_f1:.4f}")
+# Output: Final F1-Score (at 0.09 threshold): 0.2973
+```
+
+<Note>
+While an F1-Score of 0.2973 may seem low, it's significantly better than random guessing on this highly imbalanced dataset. The model successfully identifies stroke cases while maintaining acceptable precision.
+</Note>
+
+## Threshold optimization
+
+By default, classification models use a threshold of 0.5 to convert probabilities to binary predictions. However, for imbalanced datasets, this threshold is often suboptimal.
+
+### Why 0.09 instead of 0.5?
+
+The optimal threshold of **0.09** was chosen because:
+
+1. **Class imbalance** - Only ~4.8% of cases are strokes, so the model's predicted probabilities are naturally lower
+2. **Healthcare context** - It's better to have false positives (unnecessary warnings) than false negatives (missed strokes)
+3. **F1 optimization** - 0.09 provides the best balance between precision and recall
+
+**Impact of threshold choice:**
+
+| Threshold | Behavior | Trade-off |
+|-----------|----------|----------|
+| 0.5 (default) | Too conservative | Misses most stroke cases (low recall) |
+| 0.09 (optimal) | Balanced | Best F1-Score (balances precision/recall) |
+| < 0.05 | Too aggressive | Too many false alarms (low precision) |
+
+<Info>
+In production, you might adjust this threshold based on specific requirements. A lower threshold increases sensitivity (catches more strokes) at the cost of more false positives.
+</Info>
+
+## Model comparison
+
+During the development process, three different models were trained and compared:
+
+### Models tested
+
+<Tabs>
+  <Tab title="Logistic Regression">
+    **Performance:**
+    - Initial (baseline): ROC-AUC = 0.831
+    - Tuned (C=35): ROC-AUC = 0.8514, F1 = 0.2973
+    
+    **Pros:**
+    - Best overall performance
+    - Fast training and inference
+    - Fully interpretable coefficients
+    - Handles class imbalance well
+    
+    **Result:** ✅ **Selected as final model**
+  </Tab>
+  
+  <Tab title="Random Forest">
+    **Performance:**
+    - Out-of-the-box: ROC-AUC ≈ 0.76-0.78
+    - Struggled with class imbalance
+    
+    **Issues:**
+    - Overfit to majority class ("no stroke")
+    - Lower ROC-AUC than Logistic Regression
+    - More complex without performance gain
+    
+    **Result:** ❌ Not selected
+  </Tab>
+  
+  <Tab title="XGBoost">
+    **Performance:**
+    - Out-of-the-box: ROC-AUC ≈ 0.76-0.78
+    - Tuned (with scale_pos_weight): ROC-AUC ≈ 0.84, F1 ≈ 0.24-0.25
+    
+    **Pros:**
+    - Similar performance to tuned Logistic Regression
+    - Handles complex patterns
+    
+    **Cons:**
+    - "Black box" model (not interpretable)
+    - Slower to train
+    - No performance advantage over simpler model
+    
+    **Result:** ❌ Not selected (Logistic Regression preferred for simplicity)
+  </Tab>
+</Tabs>
+
+### Why Logistic Regression won
+
+Logistic Regression was chosen as the final model because:
+
+1. **Best performance** - Achieved the highest ROC-AUC (0.8514) and F1-Score (0.2973)
+2. **Simplicity** - Simpler models are easier to maintain, debug, and deploy
+3. **Interpretability** - Coefficients show which features increase/decrease stroke risk
+4. **Speed** - Faster training and inference compared to ensemble methods
+5. **Equal to complex models** - Matched XGBoost's performance without the complexity
+
+<Note>
+Following Occam's Razor: when two models perform equally well, choose the simpler one.
+</Note>
+
+## The class imbalance challenge
+
+The dataset presents a significant challenge: only **~4.8% of cases are strokes**. This extreme imbalance affects model training and evaluation.
+
+### Why accuracy is misleading
+
+A naive model that always predicts "no stroke" would achieve **~95% accuracy** but would be completely useless for identifying actual stroke risk.
+
+**Example:**
+```python
+# Naive baseline (always predict no stroke)
+accuracy = (total_cases - stroke_cases) / total_cases
+accuracy ≈ 0.952 or 95.2%  # Looks great!
+
+# But:
+recall = 0  # Catches 0% of actual strokes ❌
+```
+
+### How the model addresses imbalance
+
+1. **ROC-AUC as primary metric** - Evaluates ranking ability across all thresholds
+2. **F1-Score for balance** - Ensures both precision and recall are considered
+3. **Threshold optimization** - Using 0.09 instead of default 0.5
+4. **Regularization tuning** - C=35 allows the model to learn from minority class
+
+## Evaluation code walkthrough
+
+Here's how the `test_model.py` script evaluates the model:
+
+<Steps>
+
+### Load saved artifacts
+
+```python
+import pickle
+
+with open('dv.bin', 'rb') as f_in:
+    dv = pickle.load(f_in)
+
+with open('model.bin', 'rb') as f_in:
+    model = pickle.load(f_in)
+```
+
+### Prepare test data
+
+The same preprocessing steps from training are applied:
+
+```python
+df = pd.read_csv('healthcare-dataset-stroke-data.csv')
+
+# Same preprocessing as training
+bmi_mean = df['bmi'].mean()
+df['bmi'] = df['bmi'].fillna(bmi_mean)
+df.columns = df.columns.str.lower()
+df = df.drop('id', axis=1)
+
+# Same split (random_state=42 ensures same test set)
+df_full_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+y_test = df_test['stroke'].values
+```
+
+### Transform features
+
+```python
+df_test_features = df_test.drop('stroke', axis=1)
+test_dicts = df_test_features.to_dict(orient='records')
+X_test = dv.transform(test_dicts)  # Use transform, not fit_transform!
+```
+
+<Note>
+Use `transform()` not `fit_transform()` on test data to avoid data leakage.
+</Note>
+
+### Calculate metrics
+
+```python
+from sklearn.metrics import roc_auc_score, f1_score
+
+# Get probability predictions
+y_pred_proba = model.predict_proba(X_test)[:, 1]
+
+# ROC-AUC (threshold-independent)
+final_auc = roc_auc_score(y_test, y_pred_proba)
+
+# F1-Score at optimal threshold
+best_threshold = 0.09
+y_pred_binary = (y_pred_proba >= best_threshold).astype(int)
+final_f1 = f1_score(y_test, y_pred_binary)
+
+print(f"Final ROC-AUC Score: {final_auc:.4f}")
+print(f"Final F1-Score (at {best_threshold} threshold): {final_f1:.4f}")
+```
+
+</Steps>
+
+## Next steps
+
+Now that you understand how the model is evaluated, you can:
+
+- Learn about [model deployment](/development/docker)
+- Explore the [API reference](/api/predict)
+- Try the [quickstart guide](/quickstart) to make predictions

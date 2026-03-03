@@ -1,0 +1,125 @@
+---
+title: Request and response schemas
+description: Complete data schemas for the Stroke Prediction API
+---
+
+This page documents the data schemas used by the Stroke Prediction API.
+
+## Customer schema
+
+The `Customer` schema represents the patient data required for stroke prediction. This is the request body for the POST /predict endpoint.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `age` | float | Yes | Patient's age in years |
+| `gender` | Gender (enum) | Yes | Patient's gender |
+| `hypertension` | integer | Yes | Whether the patient has hypertension (0 = No, 1 = Yes) |
+| `heart_disease` | integer | Yes | Whether the patient has heart disease (0 = No, 1 = Yes) |
+| `ever_married` | EverMarried (enum) | Yes | Whether the patient has ever been married |
+| `work_type` | WorkType (enum) | Yes | Patient's work type |
+| `residence_type` | ResidenceType (enum) | Yes | Patient's residence type |
+| `avg_glucose_level` | float | No | Average glucose level in blood (defaults to 106.45) |
+| `bmi` | float | Yes | Body mass index |
+| `smoking_status` | SmokingStatus (enum) | Yes | Patient's smoking status |
+
+## Enum types
+
+The API uses several enum types to ensure valid categorical values.
+
+### Gender
+
+Valid values for the `gender` field:
+
+- `Male`
+- `Female`
+- `Other`
+
+### EverMarried
+
+Valid values for the `ever_married` field:
+
+- `Yes`
+- `No`
+
+### WorkType
+
+Valid values for the `work_type` field:
+
+- `Private`
+- `Self-employed`
+- `Govt_job`
+- `children`
+- `Never_worked`
+
+### ResidenceType
+
+Valid values for the `residence_type` field:
+
+- `Urban`
+- `Rural`
+
+### SmokingStatus
+
+Valid values for the `smoking_status` field:
+
+- `formerly smoked`
+- `never smoked`
+- `smokes`
+- `Unknown`
+
+## Example request
+
+<Expandable title="Complete request example">
+```json
+{
+  "age": 67.0,
+  "gender": "Female",
+  "hypertension": 0,
+  "heart_disease": 1,
+  "ever_married": "Yes",
+  "work_type": "Private",
+  "residence_type": "Urban",
+  "avg_glucose_level": 228.69,
+  "bmi": 36.6,
+  "smoking_status": "formerly smoked"
+}
+```
+</Expandable>
+
+<Expandable title="Request without optional avg_glucose_level">
+```json
+{
+  "age": 23.0,
+  "gender": "Male",
+  "hypertension": 0,
+  "heart_disease": 0,
+  "ever_married": "No",
+  "work_type": "Private",
+  "residence_type": "Urban",
+  "bmi": 30.0,
+  "smoking_status": "never smoked"
+}
+```
+
+In this case, the API will use the default value of `106.45` for `avg_glucose_level`.
+</Expandable>
+
+## Response schema
+
+The prediction endpoint returns a JSON object with the following structure:
+
+```json
+{
+  "stroke_probability": 0.1456,
+  "stroke_prediction": true
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `stroke_probability` | float | Predicted probability of stroke (0.0 to 1.0) |
+| `stroke_prediction` | boolean | Binary prediction based on 0.09 threshold |

@@ -1,0 +1,211 @@
+---
+title: Docker deployment
+description: Deploy the Stroke Risk Predictor API using Docker containers
+---
+
+Docker provides a containerized deployment approach for the Stroke Risk Predictor API. This is the recommended method for production deployments and ensures consistency across environments.
+
+## Why use Docker?
+
+Docker deployment offers several advantages:
+
+- **Consistency**: The same container runs identically in development, testing, and production
+- **Isolation**: All dependencies are packaged together, avoiding conflicts
+- **Portability**: Deploy to any platform that supports Docker (local, cloud, etc.)
+- **Simplicity**: No need to manually manage Python environments or dependencies
+
+The production API is deployed on Google Cloud Run at [api.stroke-predictor.acel.dev](https://api.stroke-predictor.acel.dev/).
+
+## Dockerfile structure
+
+The Dockerfile uses a multi-step approach to build an optimized image:
+
+```dockerfile
+# 1. Start from a lightweight, stable Python base image
+FROM python:3.10-slim
+
+# 2. Set the working directory inside the container
+WORKDIR /app
+
+# 3. Install the 'uv' package manager
+RUN pip install uv
+
+# 4. Copy *only* the dependency files first
+# This is a Docker trick to speed up builds.
+# This layer is only rebuilt if your dependencies change.
+COPY pyproject.toml uv.lock ./
+
+# 5. Install all project dependencies using uv
+# --system installs them globally inside the container
+RUN uv pip install --system -r pyproject.toml
+
+# 6. Copy all your application code and model files
+# This copies train.py, predict.py, serve.py, schemas.py, dv.bin, model.bin
+COPY *.py *.bin ./
+
+# 7. Tell Docker the port your application runs on
+EXPOSE 8000
+
+# 8. The command to run your API server
+# We use "--host 0.0.0.0" to make it reachable from outside the container
+CMD ["uvicorn", "serve:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+<Note>
+The Dockerfile uses layer caching by copying `pyproject.toml` and `uv.lock` before the application code. This means dependency installation is only re-run when dependencies change, significantly speeding up rebuilds.
+</Note>
+
+## Build the Docker image
+
+<Steps>
+  <Step title="Navigate to the project directory">
+    Ensure you're in the root directory of the stroke-risk-predictor repository:
+    
+    ```bash
+    cd stroke-risk-predictor
+    ```
+  </Step>
+
+  <Step title="Build the image">
+    Run the docker build command with a tag name:
+    
+    ```bash
+    docker build -t stroke-predictor-api .
+    ```
+    
+    This command:
+    - Uses the Dockerfile in the current directory (`.`)
+    - Tags the image as `stroke-predictor-api`
+    - Installs all dependencies using `uv`
+    - Copies the model files (`model.bin`, `dv.bin`) and Python files
+    
+    The build process typically takes 1-2 minutes on the first run.
+  </Step>
+
+  <Step title="Verify the image">
+    Check that the image was created successfully:
+    
+    ```bash
+    docker images | grep stroke-predictor-api
+    ```
+  </Step>
+</Steps>
+
+## Run the Docker container
+
+Once the image is built, you can run the API server in a container:
+
+```bash
+docker run --rm -p 8000:8000 --name stroke_predictor stroke-predictor-api
+```
+
+<Info>
+**Understanding the command:**
+- `--rm`: Automatically remove the container when it stops
+- `-p 8000:8000`: Map port 8000 on your host to port 8000 in the container
+- `--name stroke_predictor`: Give the container a friendly name
+- `stroke-predictor-api`: The image to run
+</Info>
+
+### Port mapping explained
+
+The `-p 8000:8000` flag uses the format `HOST:CONTAINER`:
+
+- **First 8000**: The port on your local machine
+- **Second 8000**: The port exposed by the container (defined by `EXPOSE 8000` in the Dockerfile)
+
+You can map to a different host port if needed:
+
+```bash
+# Run on port 9000 locally
+docker run --rm -p 9000:8000 --name stroke_predictor stroke-predictor-api
+```
+
+## Access the API
+
+Once the container is running, the API is accessible at `http://127.0.0.1:8000`.
+
+<Steps>
+  <Step title="Check the health endpoint">
+    Verify the API is running:
+    
+    ```bash
+    curl http://127.0.0.1:8000/
+    ```
+    
+    Expected response:
+    ```json
+    {
+      "status": "ok",
+      "message": "Stroke prediction service is running."
+    }
+    ```
+  </Step>
+
+  <Step title="Access Swagger UI">
+    Open your browser and navigate to:
+    
+    **http://127.0.0.1:8000/docs**
+    
+    The interactive Swagger UI lets you test the `/predict` endpoint with all valid input fields and see the API schema.
+  </Step>
+
+  <Step title="Make a prediction request">
+    Test the prediction endpoint with curl:
+    
+    ```bash
+    curl -X 'POST' \
+      'http://127.0.0.1:8000/predict' \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
+      -d '{
+            "age": 67,
+            "gender": "Female",
+            "hypertension": 0,
+            "heart_disease": 1,
+            "ever_married": "Yes",
+            "work_type": "Private",
+            "residence_type": "Urban",
+            "avg_glucose_level": 228.69,
+            "bmi": 36.6,
+            "smoking_status": "formerly smoked"
+          }'
+    ```
+    
+    The API returns:
+    - `stroke_probability`: A float between 0 and 1
+    - `stroke_prediction`: A boolean (true if probability ≥ 0.09 threshold)
+  </Step>
+</Steps>
+
+## Stop the container
+
+To stop the running container, press `Ctrl+C` in the terminal where it's running, or use:
+
+```bash
+docker stop stroke_predictor
+```
+
+<Warning>
+The container runs with the `--rm` flag, so it will be automatically removed when stopped. Any data not persisted to volumes will be lost.
+</Warning>
+
+## Production deployment
+
+The Stroke Risk Predictor API is deployed to Google Cloud Run, which runs Docker containers in a fully managed serverless environment.
+
+**Live endpoints:**
+- API: [api.stroke-predictor.acel.dev](https://api.stroke-predictor.acel.dev/)
+- API Docs: [api.stroke-predictor.acel.dev/docs](https://api.stroke-predictor.acel.dev/docs)
+
+Cloud Run automatically:
+- Scales containers based on traffic
+- Provides HTTPS endpoints
+- Handles load balancing
+- Manages container lifecycle
+
+## Next steps
+
+- Learn about [local development setup](/development/local-setup) with `uv`
+- Explore the [API endpoints](/api/overview)
+- Understand the [model architecture](/concepts/model)

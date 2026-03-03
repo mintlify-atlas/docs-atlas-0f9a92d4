@@ -1,0 +1,181 @@
+---
+title: POST /predict
+description: Predict stroke risk based on patient health data
+---
+
+The `/predict` endpoint accepts patient health data and returns the predicted stroke probability and a binary prediction.
+
+## Endpoint
+
+```
+POST /predict
+```
+
+## Request body
+
+The request body must contain a JSON object with the following parameters:
+
+<ParamField body="age" type="float" required>
+  Patient's age in years
+  
+  **Example:** `67.0`
+</ParamField>
+
+<ParamField body="gender" type="string" required>
+  Patient's gender
+  
+  **Valid values:** `Male`, `Female`, `Other`
+</ParamField>
+
+<ParamField body="hypertension" type="integer" required>
+  Whether the patient has hypertension
+  
+  **Valid values:**
+  - `0` = No
+  - `1` = Yes
+</ParamField>
+
+<ParamField body="heart_disease" type="integer" required>
+  Whether the patient has heart disease
+  
+  **Valid values:**
+  - `0` = No
+  - `1` = Yes
+</ParamField>
+
+<ParamField body="ever_married" type="string" required>
+  Whether the patient has ever been married
+  
+  **Valid values:** `Yes`, `No`
+</ParamField>
+
+<ParamField body="work_type" type="string" required>
+  Patient's work type
+  
+  **Valid values:** `Private`, `Self-employed`, `Govt_job`, `children`, `Never_worked`
+</ParamField>
+
+<ParamField body="residence_type" type="string" required>
+  Patient's residence type
+  
+  **Valid values:** `Urban`, `Rural`
+</ParamField>
+
+<ParamField body="avg_glucose_level" type="float">
+  Average glucose level in blood
+  
+  **Default:** `106.45` (if not provided)
+  
+  **Example:** `228.69`
+</ParamField>
+
+<ParamField body="bmi" type="float" required>
+  Body mass index
+  
+  **Example:** `36.6`
+</ParamField>
+
+<ParamField body="smoking_status" type="string" required>
+  Patient's smoking status
+  
+  **Valid values:** `formerly smoked`, `never smoked`, `smokes`, `Unknown`
+</ParamField>
+
+## Response
+
+The endpoint returns a JSON object with the following fields:
+
+<ResponseField name="stroke_probability" type="float">
+  The predicted probability of stroke (between 0 and 1)
+</ResponseField>
+
+<ResponseField name="stroke_prediction" type="boolean">
+  Binary prediction: `true` if stroke risk is above threshold (0.09), `false` otherwise
+</ResponseField>
+
+## Example request
+
+<CodeGroup>
+```bash curl
+curl -X 'POST' \
+  'http://127.0.0.1:8000/predict' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "age": 67,
+        "gender": "Female",
+        "hypertension": 0,
+        "heart_disease": 1,
+        "ever_married": "Yes",
+        "work_type": "Private",
+        "residence_type": "Urban",
+        "avg_glucose_level": 228.69,
+        "bmi": 36.6,
+        "smoking_status": "formerly smoked"
+      }'
+```
+
+```python Python
+import requests
+
+url = "http://127.0.0.1:8000/predict"
+data = {
+    "age": 67,
+    "gender": "Female",
+    "hypertension": 0,
+    "heart_disease": 1,
+    "ever_married": "Yes",
+    "work_type": "Private",
+    "residence_type": "Urban",
+    "avg_glucose_level": 228.69,
+    "bmi": 36.6,
+    "smoking_status": "formerly smoked"
+}
+
+response = requests.post(url, json=data)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch('http://127.0.0.1:8000/predict', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    age: 67,
+    gender: 'Female',
+    hypertension: 0,
+    heart_disease: 1,
+    ever_married: 'Yes',
+    work_type: 'Private',
+    residence_type: 'Urban',
+    avg_glucose_level: 228.69,
+    bmi: 36.6,
+    smoking_status: 'formerly smoked'
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+</CodeGroup>
+
+## Example response
+
+```json
+{
+  "stroke_probability": 0.1456,
+  "stroke_prediction": true
+}
+```
+
+## Model details
+
+The prediction model uses:
+- **Algorithm:** Tuned Logistic Regression (C=35)
+- **Decision threshold:** 0.09 (optimized for F1-score)
+- **ROC-AUC Score:** 0.8514
+- **Default glucose level:** 106.45 (mean value, used when not provided)
+
+If you omit the `avg_glucose_level` parameter, the model will use the default value of 106.45.

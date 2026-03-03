@@ -1,0 +1,186 @@
+---
+title: Dataset
+description: Details about the stroke prediction dataset, features, and preprocessing
+---
+
+## Dataset source
+
+The model is trained on the [Stroke Prediction Dataset](https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset) from Kaggle, which contains real patient data with 5,110 records.
+
+<Note>
+The dataset contains **11 input features** and **1 target variable** (`stroke`).
+</Note>
+
+## Dataset composition
+
+The dataset includes 5,110 patient records with the following class distribution:
+
+- **No Stroke:** 4,861 cases (95.1%)
+- **Stroke:** 249 cases (4.8%)
+
+The data is split into:
+- **Training set:** 80% (4,088 records)
+- **Test set:** 20% (1,022 records)
+
+## Features
+
+The model uses 11 patient features to predict stroke risk:
+
+### Demographic features
+
+<Accordion title="gender">
+The patient's gender.
+
+**Type:** Categorical  
+**Values:** `Male`, `Female`, `Other`
+</Accordion>
+
+<Accordion title="age">
+The patient's age in years.
+
+**Type:** Numerical  
+**Range:** 0.08 to 82 years  
+**Note:** Age is one of the strongest predictors of stroke risk
+</Accordion>
+
+<Accordion title="ever_married">
+Whether the patient has ever been married.
+
+**Type:** Categorical  
+**Values:** `Yes`, `No`  
+**Note:** This serves as a proxy for age and lifestyle factors
+</Accordion>
+
+### Medical history features
+
+<Accordion title="hypertension">
+Whether the patient has hypertension (high blood pressure).
+
+**Type:** Binary  
+**Values:** `0` (No), `1` (Yes)  
+**Clinical relevance:** Hypertension is a major stroke risk factor
+</Accordion>
+
+<Accordion title="heart_disease">
+Whether the patient has heart disease.
+
+**Type:** Binary  
+**Values:** `0` (No), `1` (Yes)  
+**Clinical relevance:** Cardiovascular disease significantly increases stroke risk
+</Accordion>
+
+### Lifestyle and work features
+
+<Accordion title="work_type">
+The patient's occupation type.
+
+**Type:** Categorical  
+**Values:** `Private`, `Self-employed`, `Govt_job`, `children`, `Never_worked`
+</Accordion>
+
+<Accordion title="residence_type">
+Whether the patient lives in an urban or rural area.
+
+**Type:** Categorical  
+**Values:** `Urban`, `Rural`
+</Accordion>
+
+<Accordion title="smoking_status">
+The patient's smoking history.
+
+**Type:** Categorical  
+**Values:** `formerly smoked`, `never smoked`, `smokes`, `Unknown`  
+**Note:** The `Unknown` category is treated as its own category (1,544 records) rather than being dropped or imputed
+</Accordion>
+
+### Health metrics
+
+<Accordion title="avg_glucose_level">
+The patient's average blood glucose level.
+
+**Type:** Numerical  
+**Unit:** mg/dL  
+**Mean:** 106.45 mg/dL  
+**Note:** This field is optional in the API. If not provided, the mean value (106.45) is used
+</Accordion>
+
+<Accordion title="bmi">
+The patient's Body Mass Index.
+
+**Type:** Numerical  
+**Unit:** kg/m²  
+**Note:** BMI is a measure of body fat based on height and weight
+</Accordion>
+
+## Data preprocessing
+
+The raw dataset required several preprocessing steps before model training:
+
+### Handling missing values
+
+**BMI missing values:** The `bmi` column had approximately 201 missing values (3.9% of the dataset). These were filled with the mean BMI value to preserve the dataset size.
+
+```python
+bmi_mean = df['bmi'].mean()
+df['bmi'] = df['bmi'].fillna(bmi_mean)
+```
+
+<Info>
+Filling with the mean is appropriate here because the missing values are relatively few and randomly distributed.
+</Info>
+
+### Handling unknown categories
+
+**Smoking status unknown values:** The `smoking_status` column had 1,544 "Unknown" values (30.2% of the dataset). Rather than dropping these records or imputing values, the "Unknown" category was treated as its own distinct category.
+
+```python
+# 'Unknown' is kept as a separate category
+smoking_status_values = ['never smoked', 'Unknown', 'formerly smoked', 'smokes']
+```
+
+<Note>
+Treating "Unknown" as a category preserves all data and allows the model to learn patterns specific to patients with unknown smoking history.
+</Note>
+
+### Column standardization
+
+All column names were converted to lowercase for consistency:
+
+```python
+df.columns = df.columns.str.lower()
+```
+
+### Feature removal
+
+The `id` column was dropped as it provides no predictive value:
+
+```python
+df = df.drop('id', axis=1)
+```
+
+## Feature encoding
+
+Categorical features are encoded using **DictVectorizer** with one-hot encoding:
+
+- Each categorical value becomes a binary feature
+- Numerical features are kept as-is
+- The result is a sparse matrix for efficient storage
+
+**Example:** The `smoking_status` feature becomes four binary features:
+- `smoking_status=formerly smoked`
+- `smoking_status=never smoked`
+- `smoking_status=smokes`
+- `smoking_status=Unknown`
+
+## Data quality considerations
+
+<Note>
+**Limitations:**
+- The dataset is relatively small (5,110 records)
+- Severe class imbalance (only 4.8% positive cases)
+- BMI values are imputed for ~4% of records
+- 30% of smoking status values are unknown
+- No temporal information (when data was collected)
+</Note>
+
+Despite these limitations, the dataset is sufficient for building a preliminary stroke risk assessment tool, as evidenced by the model's strong ROC-AUC performance (0.8514) on unseen data.

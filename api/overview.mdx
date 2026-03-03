@@ -1,0 +1,60 @@
+---
+title: API overview
+description: Learn about the Stroke Prediction API endpoints and how to use them
+---
+
+The Stroke Prediction API is a FastAPI service that predicts stroke risk based on patient health data. The API is built using machine learning models trained on historical stroke data.
+
+## Base URLs
+
+The API is available at the following base URLs:
+
+- **Local development**: `http://127.0.0.1:8000`
+- **Production**: `https://api.stroke-predictor.acel.dev`
+
+## Available endpoints
+
+The API provides two main endpoints:
+
+### GET /
+
+Health check endpoint that returns the service status.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "message": "Stroke prediction service is running."
+}
+```
+
+### POST /predict
+
+Predict stroke risk based on patient health data. See the [predict endpoint documentation](/api/predict) for details.
+
+## Interactive API documentation
+
+You can explore and test the API using the interactive Swagger UI documentation:
+
+- **Local**: `http://127.0.0.1:8000/docs`
+- **Production**: `https://api.stroke-predictor.acel.dev/docs`
+
+The Swagger UI provides:
+- Complete API endpoint details
+- Request/response schemas
+- Interactive testing interface
+- Valid input values for categorical features
+
+## Authentication
+
+No authentication is required to use this API. All endpoints are publicly accessible.
+
+## Next steps
+
+<Card title="Predict endpoint" icon="brain" href="/api/predict">
+  Learn how to make stroke predictions using patient health data
+</Card>
+
+<Card title="Schemas" icon="code" href="/api/schemas">
+  View the complete request and response schemas
+</Card>

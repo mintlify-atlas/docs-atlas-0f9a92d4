@@ -1,0 +1,226 @@
+---
+title: Model
+description: Model architecture, selection process, hyperparameters, and performance
+---
+
+## Model selection process
+
+Three machine learning algorithms were evaluated for the stroke prediction task:
+
+1. **Logistic Regression** (baseline)
+2. **Random Forest Classifier**
+3. **XGBoost Classifier**
+
+Each model was trained on the same preprocessed data and evaluated using ROC-AUC as the primary metric.
+
+### Initial results (default parameters)
+
+| Model | ROC-AUC Score | Notes |
+|-------|---------------|-------|
+| Logistic Regression | 0.8312 | Strong baseline performance |
+| Random Forest | 0.7673 | Poor out-of-the-box performance |
+| XGBoost | 0.7837 | Struggled with class imbalance |
+
+<Info>
+The simple Logistic Regression baseline outperformed both complex tree-based models with default settings.
+</Info>
+
+### Why tree models struggled
+
+Both Random Forest and XGBoost performed poorly initially because they **overfit to the majority class** (No Stroke). With 95.1% of training examples being negative cases, the models learned to predict "No Stroke" too frequently, resulting in low recall on stroke patients.
+
+**Solution:** Both models required tuning to handle the class imbalance:
+- **XGBoost:** Tune `scale_pos_weight` parameter to rebalance classes
+- **Logistic Regression:** Tune the regularization parameter `C`
+
+## Model tuning
+
+### Tuning Logistic Regression
+
+The `C` parameter controls regularization strength (inverse of regularization):
+- **Lower C:** More regularization, simpler model
+- **Higher C:** Less regularization, more complex model
+
+**Tuning results:**
+
+| C Value | ROC-AUC Score |
+|---------|---------------|
+| 0.001 | 0.6402 |
+| 0.01 | 0.6821 |
+| 0.1 | 0.7907 |
+| 1 | 0.8312 |
+| 10 | 0.8348 |
+| **35** | **0.8359** |
+| 50 | 0.8358 |
+| 100 | 0.8357 |
+
+<Note>
+**Optimal value:** `C=35` provided the best ROC-AUC score of 0.8359 on the validation set.
+</Note>
+
+### Tuning XGBoost
+
+XGBoost was tuned using GridSearchCV with 5-fold cross-validation to find optimal hyperparameters:
+
+**Parameter grid:**
+```python
+param_grid = {
+    'max_depth': [3, 5, 7],
+    'learning_rate': [0.1, 0.05],
+    'min_child_weight': [1, 5, 10],
+    'scale_pos_weight': 19.5  # Fixed to handle imbalance
+}
+```
+
+**Best parameters found:**
+- `learning_rate`: 0.1
+- `max_depth`: 2
+- `min_child_weight`: 10
+- `scale_pos_weight`: 19.5 (calculated as 4861 / 249)
+
+**Result:** ROC-AUC score of 0.8437 on validation set
+
+## Threshold optimization
+
+While ROC-AUC measures ranking performance, the **decision threshold** determines the actual predictions. The default threshold of 0.5 is often suboptimal for imbalanced datasets.
+
+### Optimizing F1-Score
+
+Both final models were evaluated across all possible thresholds (0.00 to 1.00) to find the threshold that maximizes F1-Score:
+
+| Model | Best F1-Score | Optimal Threshold | Interpretation |
+|-------|---------------|-------------------|----------------|
+| **Logistic Regression (C=35)** | **0.2489** | **0.09** | More aggressive (lower threshold) |
+| Tuned XGBoost | 0.2411 | 0.59 | More conservative (higher threshold) |
+
+<Info>
+The Logistic Regression model needed a much lower threshold (0.09) to achieve optimal F1-Score, meaning it flags a patient as "at risk" if the predicted probability is just 9% or higher.
+</Info>
+
+### Why a low threshold?
+
+The threshold of 0.09 reflects a deliberate trade-off:
+- **Higher recall:** Catches more actual stroke patients (minimizes false negatives)
+- **Lower precision:** Flags more false positives (non-stroke patients predicted as at-risk)
+
+For a preliminary medical screening tool, it's better to err on the side of caution and flag more patients for follow-up than to miss actual stroke risks.
+
+## Final model selection
+
+Despite similar performance, **Logistic Regression (C=35)** was chosen as the final model for four critical reasons:
+
+### 1. Performance
+
+Logistic Regression achieved the highest F1-Score (0.2489 vs 0.2411) and competitive ROC-AUC.
+
+### 2. Simplicity
+
+Logistic Regression is a linear model with far fewer parameters than XGBoost:
+- **Training time:** Seconds vs minutes
+- **Model size:** ~2 KB vs ~500 KB
+- **Prediction speed:** Near-instantaneous
+
+### 3. Interpretability
+
+Logistic Regression is a **"glass box" model** where you can see exactly how each feature contributes to the prediction through coefficient weights. This is critical for medical applications where explainability matters.
+
+**Example:** You can say "Your age increases your stroke risk by X%" rather than "The model flagged you as high risk for complex reasons."
+
+### 4. Cost and maintainability
+
+Logistic Regression is:
+- Faster to retrain with new data
+- Easier to debug and validate
+- More reliable in production
+- Lower computational cost (important for API deployment)
+
+<Note>
+When two models have similar performance, always choose the simpler one (Occam's Razor).
+</Note>
+
+## Final model architecture
+
+### Training
+
+```python
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction import DictVectorizer
+
+# 1. Vectorize features using DictVectorizer
+dv = DictVectorizer(sparse=True)
+X_train = dv.fit_transform(train_dicts)
+
+# 2. Train Logistic Regression with optimized C
+model = LogisticRegression(
+    solver='liblinear',
+    C=35,
+    max_iter=1000,
+    random_state=42
+)
+model.fit(X_train, y_train)
+```
+
+### Key hyperparameters
+
+- **Solver:** `liblinear` (best for small datasets with binary classification)
+- **C:** `35` (optimized regularization parameter)
+- **max_iter:** `1000` (ensures convergence)
+- **random_state:** `42` (for reproducibility)
+
+### Prediction
+
+```python
+# Get probability of stroke
+y_pred_proba = model.predict_proba(X)[0, 1]
+
+# Apply optimized threshold
+BEST_THRESHOLD = 0.09
+is_at_risk = (y_pred_proba >= BEST_THRESHOLD)
+```
+
+## Final performance metrics
+
+The final model was evaluated on the held-out test set (20% of data, never seen during training):
+
+### Test set results
+
+<Info>
+**ROC-AUC Score:** 0.8514  
+**F1-Score:** 0.2973 (at threshold = 0.09)  
+**Optimal Threshold:** 0.09
+</Info>
+
+### What these metrics mean
+
+**ROC-AUC of 0.8514:**
+- Strong discriminative ability
+- The model successfully ranks stroke patients higher than non-stroke patients 85% of the time
+- Significantly better than random guessing (0.5) or the baseline (no model)
+
+**F1-Score of 0.2973:**
+- Reflects the difficulty of the imbalanced classification task
+- Balances precision and recall at the optimized threshold
+- Higher than the default threshold (0.5) performance
+
+### Precision-Recall trade-off at threshold 0.09
+
+At the optimal threshold of 0.09:
+- **Higher recall:** Identifies more actual stroke patients (minimizes missed cases)
+- **Lower precision:** Flags more false positives (patients predicted at-risk who don't have strokes)
+
+This trade-off is appropriate for a preliminary screening tool where the cost of missing a stroke patient is much higher than the cost of a false alarm.
+
+## Model limitations
+
+<Note>
+**Important limitations to consider:**
+- The model is trained on a relatively small dataset (5,110 records)
+- Performance on different populations may vary
+- The F1-Score of 0.2973 indicates room for improvement
+- The model is a screening tool, not a diagnostic tool
+- Always consult medical professionals for actual health decisions
+</Note>
+
+## Model deployment
+
+The final model is saved as a pickle file (`model.bin`) along with the fitted DictVectorizer (`dv.bin`) and deployed as a REST API using FastAPI. See the [API Reference](/api/overview) for usage details.
